@@ -3,12 +3,15 @@ import { useState } from 'react';
 export default function UploadComponent({ onUpload, disabled }) {
   const [file, setFile] = useState(null);
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     if (file && !disabled) {
-      onUpload(file);
-      setFile(null);
-      event.currentTarget.reset();
+      const form = event.currentTarget;
+      const uploadSucceeded = await onUpload(file);
+      if (uploadSucceeded) {
+        setFile(null);
+        form.reset();
+      }
     }
   }
 

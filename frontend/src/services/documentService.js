@@ -1,3 +1,5 @@
+const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || '/api').replace(/\/$/, '');
+
 async function readError(response) {
   const body = await response.json().catch(() => ({}));
   return body.error?.message || 'Não foi possível concluir a operação.';
@@ -18,15 +20,15 @@ async function request(url, userId, options = {}) {
   return response;
 }
 
-export async function listDocuments(userId) {
-  const response = await request('/api/documents', userId);
+export async function listDocuments(userId, options = {}) {
+  const response = await request(`${API_BASE_URL}/documents`, userId, options);
   return response.json();
 }
 
 export async function uploadDocument(userId, file) {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await request('/api/upload', userId, {
+  const response = await request(`${API_BASE_URL}/upload`, userId, {
     method: 'POST',
     body: formData,
   });
@@ -35,7 +37,7 @@ export async function uploadDocument(userId, file) {
 
 export async function downloadDocument(userId, document) {
   const response = await request(
-    `/api/documents/${encodeURIComponent(document.id)}/download`,
+    `${API_BASE_URL}/documents/${encodeURIComponent(document.id)}/download`,
     userId,
   );
   const objectUrl = URL.createObjectURL(await response.blob());

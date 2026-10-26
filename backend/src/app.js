@@ -7,13 +7,54 @@ const { createDocumentController } = require('./controllers/documentController')
 const { createDocumentService } = require('./services/documentService');
 const { createDocumentRepository } = require('./repositories/documentRepository');
 
+function getMaxFileSize(options) {
+  const configuredValue = options.maxFileSize ?? process.env.MAX_FILE_SIZE;
+  if (configuredValue === undefined || configuredValue === '') {
+    return 10 * 1024 * 1024;
+  }
+
+  const maxFileSize = Number(configuredValue);
+  if (!Number.isSafeInteger(maxFileSize) || maxFileSize <= 0) {
+    throw new Error('MAX_FILE_SIZE deve ser um inteiro positivo em bytes.');
+  }
+  return maxFileSize;
+}
+
+function getMaxStorageBytes(options) {
+  const configuredValue = options.maxStorageBytes ?? process.env.MAX_STORAGE_BYTES;
+  if (configuredValue === undefined || configuredValue === '') {
+    return 1024 * 1024 * 1024;
+  }
+
+  const maxStorageBytes = Number(configuredValue);
+  if (!Number.isSafeInteger(maxStorageBytes) || maxStorageBytes <= 0) {
+    throw new Error('MAX_STORAGE_BYTES deve ser um inteiro positivo em bytes.');
+  }
+  return maxStorageBytes;
+}
+
+function getStorageUsage(storageDir) {
+  return fs.readdirSync(storageDir, { withFileTypes: true })
+    .filter((entry) => entry.isFile())
+    .reduce((total, entry) => {
+      const filePath = path.join(storageDir, entry.name);
+      return total + fs.statSync(filePath).size;
+    }, 0);
+}
+
 function createApp(options = {}) {
   const storageDir = options.storageDir || process.env.STORAGE_DIR
     ? path.resolve(options.storageDir || process.env.STORAGE_DIR)
     : path.join(__dirname, '..', 'storage');
-  const maxFileSize = options.maxFileSize || Number(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024;
+  const maxFileSize = getMaxFileSize(options);
+  const maxStorageBytes = getMaxStorageBytes(options);
   const repository = createDocumentRepository();
-  const service = createDocumentService({ repository, storageDir: path.resolve(storageDir) });
+  const service = createDocumentService({
+    repository,
+    storageDir: path.resolve(storageDir),
+    maxStorageBytes,
+    initialStorageBytes: getStorageUsage(storageDir),
+  });
   const controller = createDocumentController({ service });
   const app = express();
 

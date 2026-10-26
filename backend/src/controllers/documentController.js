@@ -14,14 +14,20 @@ function createDocumentController({ service }) {
   return {
     requireUser,
 
-    upload(req, res) {
+    async upload(req, res) {
       if (!req.file) {
         return res.status(400).json({
           error: { code: 'FILE_REQUIRED', message: 'Envie um arquivo no campo "file".' },
         });
       }
 
-      return res.status(201).json(service.createDocument(req.file, req.userId));
+      const document = await service.createDocument(req.file, req.userId);
+      if (!document) {
+        return res.status(507).json({
+          error: { code: 'STORAGE_LIMIT_EXCEEDED', message: 'A capacidade local de armazenamento foi atingida.' },
+        });
+      }
+      return res.status(201).json(document);
     },
 
     list(req, res) {

@@ -1,14 +1,22 @@
 const path = require('node:path');
 const { randomUUID } = require('node:crypto');
+const fs = require('node:fs/promises');
 
-function createDocumentService({ repository, storageDir }) {
+function createDocumentService({ repository, storageDir, maxStorageBytes, initialStorageBytes }) {
+  let storedBytes = initialStorageBytes;
+
   function toPublicDocument(document) {
     const { storageName, ...metadata } = document;
     return metadata;
   }
 
   return {
-    createDocument(file, owner) {
+    async createDocument(file, owner) {
+      if (storedBytes + file.size > maxStorageBytes) {
+        await fs.unlink(file.path);
+        return null;
+      }
+
       const document = repository.add({
         id: randomUUID(),
         originalName: file.originalname,
@@ -17,6 +25,7 @@ function createDocumentService({ repository, storageDir }) {
         owner,
         storageName: file.filename,
       });
+      storedBytes += file.size;
       return toPublicDocument(document);
     },
 

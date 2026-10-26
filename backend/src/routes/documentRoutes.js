@@ -9,7 +9,14 @@ function createDocumentRouter({ controller, storageDir, maxFileSize }) {
       destination: storageDir,
       filename: (req, file, callback) => callback(null, randomUUID()),
     }),
-    limits: { fileSize: maxFileSize },
+    limits: {
+      fileSize: maxFileSize,
+      files: 1,
+      fields: 0,
+      parts: 2,
+      fieldNameSize: 100,
+      headerPairs: 50,
+    },
   });
 
   router.post('/upload', controller.requireUser, upload.single('file'), controller.upload);
