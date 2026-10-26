@@ -46,10 +46,11 @@ Oferecer uma aplicação web para que usuários identifiquem seu espaço de trab
 | RNF-03 | Os metadados são mantidos em memória pelo processo; não há banco de dados nesta fase. |
 | RNF-04 | O nome físico do arquivo é gerado pelo servidor e não deriva do nome informado pelo cliente. |
 | RNF-05 | O tamanho máximo padrão por arquivo é 10 MiB; a configuração pode ser alterada por variável de ambiente. |
-| RNF-06 | A configuração de porta, diretório de armazenamento e limite de upload deve ser externa ao código via variáveis de ambiente, preservando o padrão 12-Factor. |
-| RNF-07 | As camadas internas não dependem do Express: o fluxo de dependência é `routes -> controllers -> services -> repositories`. |
-| RNF-08 | Erros de entrada têm resposta JSON previsível; erros internos não expõem stack trace ao cliente. |
-| RNF-09 | A interface acessa o backend via `fetch` no prefixo `/api`; o proxy de desenvolvimento do Vite remove esse prefixo e encaminha para o backend local. |
+| RNF-06 | O armazenamento local tem capacidade total configurável, padrão de 1 GiB; uploads que ultrapassem o limite são rejeitados e removidos. |
+| RNF-07 | A configuração de porta, diretório de armazenamento e limites de armazenamento deve ser externa ao código via variáveis de ambiente, preservando o padrão 12-Factor. |
+| RNF-08 | As camadas internas não dependem do Express: o fluxo de dependência é `routes -> controllers -> services -> repositories`. |
+| RNF-09 | Erros de entrada têm resposta JSON previsível; erros internos não expõem stack trace ao cliente. |
+| RNF-10 | A interface acessa o backend via `fetch`, usando `VITE_API_BASE_URL` quando definido e `/api` como padrão; no desenvolvimento, o proxy do Vite remove esse prefixo e encaminha para o backend local. |
 
 ## 5. Modelo de dados (metadados do documento)
 
@@ -70,7 +71,7 @@ O repositório mantém, além dos metadados públicos, o nome físico aleatório
 - O backend expõe os caminhos abaixo sem prefixo. O frontend os consome por `/api` através do proxy Vite.
 - Todas as operações de documentos exigem `X-User-Id`, com valor não vazio e até 100 caracteres. O cabeçalho é um identificador de escopo, **não é autenticação** e não deve ser usado como controle de acesso em uma implantação exposta a usuários não confiáveis.
 - Respostas de erro seguem o formato `{ "error": { "code": "...", "message": "..." } }`.
-- Limite padrão de upload: 10 MiB, configurável em `MAX_FILE_SIZE`.
+- Limite padrão de upload: 10 MiB, configurável em `MAX_FILE_SIZE`; capacidade total padrão de 1 GiB, configurável em `MAX_STORAGE_BYTES`.
 
 ### `POST /upload`
 
@@ -114,7 +115,7 @@ Exemplo de sucesso:
 - O service cria identificadores e datas, aplica as regras de propriedade e remove campos internos do retorno público.
 - O repository mantém metadados em memória. O filesystem local contém os bytes dos arquivos.
 - O diretório padrão de armazenamento é `backend/storage`; `STORAGE_DIR` pode substituí-lo. O diretório é criado quando necessário.
-- `PORT` configura a porta do Express (padrão `3000`); `MAX_FILE_SIZE` configura o limite de bytes por upload (padrão `10485760`).
+- `PORT` configura a porta do Express (padrão `3000`); `MAX_FILE_SIZE` configura o limite de bytes por upload (padrão `10485760`); `MAX_STORAGE_BYTES` limita o total de arquivos no diretório (padrão `1073741824`).
 - A interface React usa componentes para upload, listagem e download; o serviço frontend centraliza chamadas `fetch`.
 - O identificador de usuário salvo no navegador facilita a seleção do espaço, mas não representa uma identidade verificada. Autenticação real exigirá evolução fora deste escopo.
 - Como metadados não persistem, após reinício a aplicação pode manter arquivos órfãos no disco; limpeza automática não faz parte desta versão.
