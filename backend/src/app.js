@@ -1,32 +1,61 @@
-// Seed do servidor backend do Document Management System.
-//
-// Este arquivo é apenas um ponto de partida mínimo. Ao longo do workshop você
-// vai usar o Agent Mode do GitHub Copilot para construir as camadas:
-//   - routes/       (definição das rotas)
-//   - controllers/  (entrada HTTP e validação)
-//   - services/     (regras de negócio)
-//   - repositories/ (persistência: arquivos locais + metadados em memória)
-//
-// Restrição do projeto: uploads são gravados no filesystem local da aplicação
-// usando multer com diskStorage. Não utilize provedores externos.
-
 const express = require('express');
+const fs = require('node:fs');
+const path = require('node:path');
+const multer = require('multer');
+const { createDocumentRouter } = require('./routes/documentRoutes');
+const { createDocumentController } = require('./controllers/documentController');
+const { createDocumentService } = require('./services/documentService');
+const { createDocumentRepository } = require('./repositories/documentRepository');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+function createApp(options = {}) {
+  const storageDir = options.storageDir || process.env.STORAGE_DIR
+    ? path.resolve(options.storageDir || process.env.STORAGE_DIR)
+    : path.join(__dirname, '..', 'storage');
+  const maxFileSize = options.maxFileSize || Number(process.env.MAX_FILE_SIZE) || 10 * 1024 * 1024;
+  const repository = createDocumentRepository();
+  const service = createDocumentService({ repository, storageDir: path.resolve(storageDir) });
+  const controller = createDocumentController({ service });
+  const app = express();
 
-app.use(express.json());
+  fs.mkdirSync(storageDir, { recursive: true });
+  app.use(express.json());
+  app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+  });
+  app.use(createDocumentRouter({ controller, storageDir, maxFileSize }));
+  app.use((req, res) => {
+    res.status(404).json({ error: { code: 'NOT_FOUND', message: 'Recurso não encontrado.' } });
+  });
+  app.use((error, req, res, next) => {
+    if (res.headersSent) {
+      return next(error);
+    }
 
-// Endpoint de verificação de saúde. As demais rotas (/upload, /documents,
-// /documents/:id/download) serão implementadas durante o Passo 2.
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
+    if (error instanceof multer.MulterError) {
+      const status = error.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+      const message = error.code === 'LIMIT_FILE_SIZE'
+        ? 'O arquivo excede o tamanho máximo permitido.'
+        : 'Não foi possível processar o arquivo enviado.';
+      return res.status(status).json({ error: { code: error.code, message } });
+    }
+
+    console.error(error);
+    return res.status(500).json({
+      error: { code: 'INTERNAL_ERROR', message: 'Ocorreu um erro interno.' },
+    });
+  });
+
+  return app;
+}
+
+const app = createApp();
 
 if (require.main === module) {
+  const PORT = process.env.PORT || 3000;
   app.listen(PORT, () => {
     console.log(`DMS backend ouvindo na porta ${PORT}`);
   });
 }
 
 module.exports = app;
+module.exports.createApp = createApp;
